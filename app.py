@@ -1,10 +1,13 @@
 import streamlit as st
 import sqlite3
+import os  # <- Added
 
-
-# Connect to the SQLite database
-conn = sqlite3.connect("mydatabase.db", check_same_thread=False)
+# Connect to the SQLite database inside .streamlit folder
+db_path = os.path.join(".streamlit", "mydatabase.db")
+conn = sqlite3.connect(db_path, check_same_thread=False)
 c = conn.cursor()
+
+# Your existing code remains unchanged...
 
 
 # ---------- Database Functions ----------
