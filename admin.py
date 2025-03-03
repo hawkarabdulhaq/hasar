@@ -2,19 +2,18 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 
-# ---------------------------
-# Database Connection
-# ---------------------------
+# --------------------------------
+# Database connection
+# --------------------------------
 def get_connection():
     """
     Returns a connection object to the SQLite database.
     """
-    conn = sqlite3.connect('mydatabase.db')
-    return conn
+    return sqlite3.connect("mydatabase.db")
 
-# ---------------------------
-# Refresh Search Table
-# ---------------------------
+# --------------------------------
+# Refresh the Search table
+# --------------------------------
 def refresh_search_table():
     """
     Re-populates the 'Search' table by joining data from
@@ -52,203 +51,324 @@ def refresh_search_table():
     cursor = conn.cursor()
     cursor.execute("DELETE FROM Search")
     
-    # Insert new data from the joined query into 'Search' table
+    # Insert new data
     df.to_sql('Search', conn, if_exists='append', index=False)
     
     conn.commit()
     conn.close()
 
-# ---------------------------
-# Page Navigation
-# ---------------------------
+# --------------------------------
+# Helper: Insert single rows
+# --------------------------------
+def insert_into_nurseries(Registration_code, Nursery_name, Address,
+                          Contact_name, Contact_phone, Google_map_link,
+                          Additional_notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO Nurseries
+        (Registration_code, Nursery_name, Address, Contact_name,
+         Contact_phone, Google_map_link, Additional_notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    cursor.execute(query, (Registration_code, Nursery_name, Address,
+                           Contact_name, Contact_phone, Google_map_link,
+                           Additional_notes))
+    conn.commit()
+    conn.close()
+
+def insert_into_trees(Common_name, Scientific_name, Growth_rate,
+                      Watering_demand, shape, Care_instructions,
+                      Main_Photo_url, Origin, Soil_type, Root_type,
+                      Leaf_Type):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO Trees
+        (Common_name, Scientific_name, Growth_rate, Watering_demand,
+         shape, Care_instructions, Main_Photo_url, Origin, Soil_type,
+         Root_type, Leaf_Type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    cursor.execute(query, (Common_name, Scientific_name, Growth_rate,
+                           Watering_demand, shape, Care_instructions,
+                           Main_Photo_url, Origin, Soil_type,
+                           Root_type, Leaf_Type))
+    conn.commit()
+    conn.close()
+
+def insert_into_nursery_inventory(nursery_name, tree_common_name,
+                                  Quantity_in_stock, Min_height,
+                                  Max_height, Packaging_type, Price):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO Nursery_Tree_Inventory
+        (nursery_name, tree_common_name, Quantity_in_stock,
+         Min_height, Max_height, Packaging_type, Price)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    cursor.execute(query, (nursery_name, tree_common_name, Quantity_in_stock,
+                           Min_height, Max_height, Packaging_type, Price))
+    conn.commit()
+    conn.close()
+
+def insert_into_search(tree_common_name, Quantity_in_stock, Min_height,
+                       Max_height, Packaging_type, Price, Scientific_name,
+                       Growth_rate, Watering_demand, shape,
+                       Care_instructions, Main_Photo_url, Origin, Soil_type,
+                       Root_type, Leaf_Type, Address):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO Search
+        (tree_common_name, Quantity_in_stock, Min_height, Max_height,
+         Packaging_type, Price, Scientific_name, Growth_rate,
+         Watering_demand, shape, Care_instructions, Main_Photo_url,
+         Origin, Soil_type, Root_type, Leaf_Type, Address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    cursor.execute(query, (tree_common_name, Quantity_in_stock, Min_height,
+                           Max_height, Packaging_type, Price, Scientific_name,
+                           Growth_rate, Watering_demand, shape,
+                           Care_instructions, Main_Photo_url, Origin,
+                           Soil_type, Root_type, Leaf_Type, Address))
+    conn.commit()
+    conn.close()
+
+# --------------------------------
+# Main App
+# --------------------------------
 st.sidebar.title("Navigation")
 page_selection = st.sidebar.selectbox("Go to:", ["Search Page", "Data Entry Page"])
 
-# =====================================================
+# ---------------------------
 # Page 1: SEARCH PAGE
-# =====================================================
+# ---------------------------
 if page_selection == "Search Page":
     st.title("Search Trees")
     
-    # Load the data from 'Search' table
     conn = get_connection()
     df_search = pd.read_sql_query("SELECT * FROM Search", conn)
     conn.close()
     
     if not df_search.empty:
-        # Let user pick a tree to view details
-        selected_tree = st.selectbox("Select Tree Common Name", df_search["tree_common_name"].unique())
+        selected_tree = st.selectbox("Select Tree Common Name",
+                                     df_search["tree_common_name"].unique())
         selected_data = df_search[df_search["tree_common_name"] == selected_tree]
-        
         st.subheader("Tree Details")
         st.dataframe(selected_data)
     else:
-        st.write("No data available in 'Search' table. Please add or refresh data in the 'Data Entry' page.")
+        st.write("No data in 'Search' table. Use 'Data Entry Page' to add data or refresh.")
 
-# =====================================================
+# ---------------------------
 # Page 2: DATA ENTRY PAGE
-# =====================================================
+# ---------------------------
 elif page_selection == "Data Entry Page":
-    st.title("Data Entry & Admin Tasks")
+    st.title("Data Entry & Admin")
 
     # ------------------------------------
-    # 1. Select Table
+    # TABS for each table
     # ------------------------------------
-    st.subheader("Select a Table")
-    table_choice = st.selectbox(
-        "Choose a table to manage:",
-        ["Nurseries", "Trees", "Nursery_Tree_Inventory", "Search"]
-    )
+    tab_names = ["Nurseries", "Trees", "Nursery_Tree_Inventory", "Search"]
+    tabs = st.tabs(tab_names)
 
-    # ------------------------------------
-    # 2. BULK UPLOAD CSV
-    # ------------------------------------
-    st.subheader(f"Bulk Upload Records into '{table_choice}'")
-    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        conn = get_connection()
-        df.to_sql(table_choice, conn, if_exists='append', index=False)
-        conn.commit()
-        conn.close()
-        st.success(f"Data uploaded to '{table_choice}' table successfully.")
+    # =======================
+    # 1) Nurseries Tab
+    # =======================
+    with tabs[0]:
+        st.header("Nurseries Table")
 
-    # ------------------------------------
-    # 3. SINGLE DATA ENTRY
-    # ------------------------------------
-    st.subheader(f"Single Record Entry for '{table_choice}'")
+        # -- Bulk Upload
+        st.subheader("Bulk Upload CSV")
+        nurseries_file = st.file_uploader("Upload CSV for Nurseries", type=["csv"])
+        if nurseries_file:
+            df = pd.read_csv(nurseries_file)
+            conn = get_connection()
+            df.to_sql("Nurseries", conn, if_exists="append", index=False)
+            conn.commit()
+            conn.close()
+            st.success("Nurseries CSV uploaded successfully.")
 
-    # Depending on the table, we present the relevant fields
-    if table_choice == "Nurseries":
-        with st.form("nurseries_form"):
-            nursery_name = st.text_input("Nursery Name")
-            address = st.text_input("Address")
-            submit_nursery = st.form_submit_button("Add Nursery")
-            
-            if submit_nursery:
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Nurseries (Nursery_name, Address)
-                    VALUES (?, ?)
-                """, (nursery_name, address))
-                conn.commit()
-                conn.close()
-                st.success("Nursery record added successfully.")
+        # -- Single Entry
+        st.subheader("Single Entry Form")
+        with st.form("nurseries_single_entry_form"):
+            Registration_code = st.text_input("Registration_code")
+            Nursery_name = st.text_input("Nursery_name")
+            Address = st.text_input("Address")
+            Contact_name = st.text_input("Contact_name")
+            Contact_phone = st.text_input("Contact_phone")
+            Google_map_link = st.text_input("Google_map_link")
+            Additional_notes = st.text_area("Additional_notes")
+            submitted = st.form_submit_button("Add Row")
+            if submitted:
+                insert_into_nurseries(
+                    Registration_code,
+                    Nursery_name,
+                    Address,
+                    Contact_name,
+                    Contact_phone,
+                    Google_map_link,
+                    Additional_notes
+                )
+                st.success("New row added to Nurseries.")
 
-    elif table_choice == "Trees":
-        with st.form("trees_form"):
-            common_name = st.text_input("Common Name")
-            scientific_name = st.text_input("Scientific Name")
-            growth_rate = st.text_input("Growth Rate")
-            watering_demand = st.text_input("Watering Demand")
-            shape = st.text_input("Shape")
-            care_instructions = st.text_input("Care Instructions")
-            main_photo_url = st.text_input("Main Photo URL")
-            origin = st.text_input("Origin")
-            soil_type = st.text_input("Soil Type")
-            root_type = st.text_input("Root Type")
-            leaf_type = st.text_input("Leaf Type")
-            
-            submit_tree = st.form_submit_button("Add Tree")
-            
-            if submit_tree:
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Trees (
-                        Common_name, Scientific_name, Growth_rate, Watering_demand,
-                        shape, Care_instructions, Main_Photo_url, Origin,
-                        Soil_type, Root_type, Leaf_Type
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    common_name, scientific_name, growth_rate, watering_demand,
-                    shape, care_instructions, main_photo_url, origin,
-                    soil_type, root_type, leaf_type
-                ))
-                conn.commit()
-                conn.close()
-                st.success("Tree record added successfully.")
+    # =======================
+    # 2) Trees Tab
+    # =======================
+    with tabs[1]:
+        st.header("Trees Table")
 
-    elif table_choice == "Nursery_Tree_Inventory":
-        with st.form("nti_form"):
-            nursery_name = st.text_input("Nursery Name")
-            tree_common_name = st.text_input("Tree Common Name")
-            quantity_in_stock = st.number_input("Quantity in Stock", min_value=0, step=1)
-            min_height = st.number_input("Min Height (in cm)", min_value=0, step=1)
-            max_height = st.number_input("Max Height (in cm)", min_value=0, step=1)
-            packaging_type = st.text_input("Packaging Type")
-            price = st.number_input("Price", min_value=0.0, step=0.01)
-            
-            submit_nti = st.form_submit_button("Add to Inventory")
-            
-            if submit_nti:
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Nursery_Tree_Inventory (
-                        nursery_name, tree_common_name, Quantity_in_stock,
-                        Min_height, Max_height, Packaging_type, Price
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    nursery_name, tree_common_name, quantity_in_stock,
-                    min_height, max_height, packaging_type, price
-                ))
-                conn.commit()
-                conn.close()
-                st.success("Inventory record added successfully.")
+        # -- Bulk Upload
+        st.subheader("Bulk Upload CSV")
+        trees_file = st.file_uploader("Upload CSV for Trees", type=["csv"])
+        if trees_file:
+            df = pd.read_csv(trees_file)
+            conn = get_connection()
+            df.to_sql("Trees", conn, if_exists="append", index=False)
+            conn.commit()
+            conn.close()
+            st.success("Trees CSV uploaded successfully.")
 
-    elif table_choice == "Search":
-        # Typically, Search is derived. But here is single data entry if needed.
-        with st.form("search_form"):
-            tree_common_name = st.text_input("Tree Common Name")
-            quantity_in_stock = st.number_input("Quantity in Stock", min_value=0, step=1)
-            min_height = st.number_input("Min Height (in cm)", min_value=0, step=1)
-            max_height = st.number_input("Max Height (in cm)", min_value=0, step=1)
-            packaging_type = st.text_input("Packaging Type")
-            price = st.number_input("Price", min_value=0.0, step=0.01)
-            scientific_name = st.text_input("Scientific Name")
-            growth_rate = st.text_input("Growth Rate")
-            watering_demand = st.text_input("Watering Demand")
-            shape = st.text_input("Shape")
-            care_instructions = st.text_input("Care Instructions")
-            main_photo_url = st.text_input("Main Photo URL")
-            origin = st.text_input("Origin")
-            soil_type = st.text_input("Soil Type")
-            root_type = st.text_input("Root Type")
-            leaf_type = st.text_input("Leaf Type")
-            address = st.text_input("Nursery Address")
-            
-            submit_search = st.form_submit_button("Add Search Record")
-            
-            if submit_search:
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Search (
-                        tree_common_name, Quantity_in_stock, Min_height, Max_height,
-                        Packaging_type, Price, Scientific_name, Growth_rate,
-                        Watering_demand, shape, Care_instructions, Main_Photo_url,
-                        Origin, Soil_type, Root_type, Leaf_Type, Address
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    tree_common_name, quantity_in_stock, min_height, max_height,
-                    packaging_type, price, scientific_name, growth_rate,
-                    watering_demand, shape, care_instructions, main_photo_url,
-                    origin, soil_type, root_type, leaf_type, address
-                ))
-                conn.commit()
-                conn.close()
-                st.success("Record added to 'Search' table successfully.")
+        # -- Single Entry
+        st.subheader("Single Entry Form")
+        with st.form("trees_single_entry_form"):
+            Common_name = st.text_input("Common_name")
+            Scientific_name = st.text_input("Scientific_name")
+            Growth_rate = st.number_input("Growth_rate", value=0.0)
+            Watering_demand = st.text_input("Watering_demand")
+            shape = st.text_input("shape")
+            Care_instructions = st.text_area("Care_instructions")
+            Main_Photo_url = st.text_input("Main_Photo_url")
+            Origin = st.text_input("Origin")
+            Soil_type = st.text_input("Soil_type")
+            Root_type = st.text_input("Root_type")
+            Leaf_Type = st.text_input("Leaf_Type")
 
-    # ------------------------------------
-    # 4. REFRESH SEARCH TABLE
-    # ------------------------------------
+            submitted_trees = st.form_submit_button("Add Row")
+            if submitted_trees:
+                insert_into_trees(
+                    Common_name,
+                    Scientific_name,
+                    Growth_rate,
+                    Watering_demand,
+                    shape,
+                    Care_instructions,
+                    Main_Photo_url,
+                    Origin,
+                    Soil_type,
+                    Root_type,
+                    Leaf_Type
+                )
+                st.success("New row added to Trees.")
+
+    # =======================
+    # 3) Nursery_Tree_Inventory Tab
+    # =======================
+    with tabs[2]:
+        st.header("Nursery_Tree_Inventory Table")
+
+        # -- Bulk Upload
+        st.subheader("Bulk Upload CSV")
+        inventory_file = st.file_uploader("Upload CSV for Nursery_Tree_Inventory", type=["csv"])
+        if inventory_file:
+            df = pd.read_csv(inventory_file)
+            conn = get_connection()
+            df.to_sql("Nursery_Tree_Inventory", conn, if_exists="append", index=False)
+            conn.commit()
+            conn.close()
+            st.success("Nursery_Tree_Inventory CSV uploaded successfully.")
+
+        # -- Single Entry
+        st.subheader("Single Entry Form")
+        with st.form("inventory_single_entry_form"):
+            nursery_name = st.text_input("nursery_name")
+            tree_common_name = st.text_input("tree_common_name")
+            Quantity_in_stock = st.number_input("Quantity_in_stock", value=0, step=1)
+            Min_height = st.number_input("Min_height", value=0.0)
+            Max_height = st.number_input("Max_height", value=0.0)
+            Packaging_type = st.text_input("Packaging_type")
+            Price = st.number_input("Price", value=0.0)
+
+            submitted_inventory = st.form_submit_button("Add Row")
+            if submitted_inventory:
+                insert_into_nursery_inventory(
+                    nursery_name,
+                    tree_common_name,
+                    Quantity_in_stock,
+                    Min_height,
+                    Max_height,
+                    Packaging_type,
+                    Price
+                )
+                st.success("New row added to Nursery_Tree_Inventory.")
+
+    # =======================
+    # 4) Search Table Tab
+    # =======================
+    with tabs[3]:
+        st.header("Search Table")
+
+        # -- Bulk Upload
+        st.subheader("Bulk Upload CSV")
+        search_file = st.file_uploader("Upload CSV for Search", type=["csv"])
+        if search_file:
+            df = pd.read_csv(search_file)
+            conn = get_connection()
+            df.to_sql("Search", conn, if_exists="append", index=False)
+            conn.commit()
+            conn.close()
+            st.success("Search CSV uploaded successfully.")
+
+        # -- Single Entry
+        st.subheader("Single Entry Form")
+        with st.form("search_single_entry_form"):
+            tree_common_name = st.text_input("tree_common_name")
+            Quantity_in_stock = st.number_input("Quantity_in_stock", value=0, step=1)
+            Min_height = st.number_input("Min_height", value=0.0)
+            Max_height = st.number_input("Max_height", value=0.0)
+            Packaging_type = st.text_input("Packaging_type")
+            Price = st.number_input("Price", value=0.0)
+            Scientific_name = st.text_input("Scientific_name")
+            Growth_rate = st.number_input("Growth_rate", value=0.0)
+            Watering_demand = st.text_input("Watering_demand")
+            shape = st.text_input("shape")
+            Care_instructions = st.text_area("Care_instructions")
+            Main_Photo_url = st.text_input("Main_Photo_url")
+            Origin = st.text_input("Origin")
+            Soil_type = st.text_input("Soil_type")
+            Root_type = st.text_input("Root_type")
+            Leaf_Type = st.text_input("Leaf_Type")
+            Address = st.text_input("Address")
+
+            submitted_search = st.form_submit_button("Add Row")
+            if submitted_search:
+                insert_into_search(
+                    tree_common_name,
+                    Quantity_in_stock,
+                    Min_height,
+                    Max_height,
+                    Packaging_type,
+                    Price,
+                    Scientific_name,
+                    Growth_rate,
+                    Watering_demand,
+                    shape,
+                    Care_instructions,
+                    Main_Photo_url,
+                    Origin,
+                    Soil_type,
+                    Root_type,
+                    Leaf_Type,
+                    Address
+                )
+                st.success("New row added to Search.")
+
+    # -----------------------------------------
+    # Refresh Search Table (joins from main DB)
+    # -----------------------------------------
     st.subheader("Refresh 'Search' Table")
-    st.write("Refresh the 'Search' table to pull updated data from the main tables (Nurseries, Trees, Nursery_Tree_Inventory).")
+    st.write("Refresh the 'Search' table to pull updated data from the main tables.")
     if st.button("Refresh Now"):
         refresh_search_table()
         st.success("Search table refreshed successfully.")
