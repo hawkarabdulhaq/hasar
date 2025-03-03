@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from search import show_search_page  # Import the search page function
 
 # --------------------------------
 # Database connection
@@ -120,26 +121,14 @@ st.sidebar.title("Navigation")
 page_selection = st.sidebar.selectbox("Go to:", ["Search Page", "Data Entry Page"])
 
 # ---------------------------
-# Page 1: SEARCH PAGE
+# PAGE 1: SEARCH PAGE
 # ---------------------------
 if page_selection == "Search Page":
-    st.title("Search Trees")
-    
-    conn = get_connection()
-    df_search = pd.read_sql_query("SELECT * FROM Search", conn)
-    conn.close()
-    
-    if not df_search.empty:
-        selected_tree = st.selectbox("Select Tree Common Name",
-                                     df_search["tree_common_name"].unique())
-        selected_data = df_search[df_search["tree_common_name"] == selected_tree]
-        st.subheader("Tree Details")
-        st.dataframe(selected_data)
-    else:
-        st.write("No data in 'Search' table. Use 'Data Entry Page' to add data or refresh.")
+    # Simply call the function from search.py
+    show_search_page()
 
 # ---------------------------
-# Page 2: DATA ENTRY PAGE
+# PAGE 2: DATA ENTRY PAGE
 # ---------------------------
 elif page_selection == "Data Entry Page":
     st.title("Data Entry & Admin")
@@ -260,10 +249,9 @@ elif page_selection == "Data Entry Page":
         # -- Single Entry
         st.subheader("Single Entry Form")
         with st.form("inventory_single_entry_form"):
-            # --- Fetch existing nursery names for dropdown
+            # --- Fetch existing nursery names
             conn = get_connection()
             nurseries_df = pd.read_sql_query("SELECT Nursery_name FROM Nurseries", conn)
-            # --- Fetch existing tree names for dropdown
             trees_df = pd.read_sql_query("SELECT Common_name FROM Trees", conn)
             conn.close()
 
