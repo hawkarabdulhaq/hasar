@@ -260,16 +260,19 @@ elif page_selection == "Data Entry Page":
         # -- Single Entry
         st.subheader("Single Entry Form")
         with st.form("inventory_single_entry_form"):
-            # Fetch existing nursery names for dropdown
+            # --- Fetch existing nursery names for dropdown
             conn = get_connection()
             nurseries_df = pd.read_sql_query("SELECT Nursery_name FROM Nurseries", conn)
+            # --- Fetch existing tree names for dropdown
+            trees_df = pd.read_sql_query("SELECT Common_name FROM Trees", conn)
             conn.close()
 
-            # Convert that list of nursery names into a set or unique list, in case of duplicates
             nursery_options = sorted(nurseries_df["Nursery_name"].unique())
+            tree_options = sorted(trees_df["Common_name"].unique())
 
             nursery_name = st.selectbox("nursery_name", nursery_options)
-            tree_common_name = st.text_input("tree_common_name")
+            tree_common_name = st.selectbox("tree_common_name", tree_options)
+
             Quantity_in_stock = st.number_input("Quantity_in_stock", value=0, step=1)
             Min_height = st.number_input("Min_height", value=0.0)
             Max_height = st.number_input("Max_height", value=0.0)
